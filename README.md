@@ -1,5 +1,20 @@
 # hackinthedisco
 
-Movinghead Address - Ranges
-https://www.chauvetprofessional.com/wp-content/uploads/2022/08/Rogue-Outcast-1L-Beam_UM_Rev2.pdf
+## Overview
+We have tracking input from a Software called Pharus, that gives us the 2D Position of people in space and MotionSuites with 8 gyroscope for each body.
+As output we can control 20 movinghead lights and use the sound PA.
 
+To get the tracking data, tell the data-hub your IP and you'll receive the data on port 10.000 via OSC-protocoll.
+To control the moving head lights send your data to the IP 192.168.0.10 (data-hub) and tell the port you are sending on.
+
+## Communication Diagram
+
+![image info](./Hackinthedisco_Verschaltung.drawio.png)
+
+## OSC namings
+* light[1-20]/intensity [0-255]
+* light[1-20]/color [0-255]
+* light[1-20]/frost [0-255]
+* light[1-20]/posx [0-255]
+* light[1-20]/posy [0-255]
+* light[1-20]/height [0-255]
