@@ -10,6 +10,7 @@ update_rate = 1 / 10
 check_trackers_up_to = 15
 game_dim_x = 17.0
 game_dim_y = 10.0
+update_rate = 1 / 20
 # from functools import partial
 
 
@@ -43,24 +44,26 @@ ball_position = [0, 0, 0]
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
-send_ip = "127.0.0.1"
-send_port = 10001
+# send_ip = "127.0.0.1"
+send_ip = "192.168.0.232"
+send_port = 10009
 
 n_trackers = 15
 n_lights = 20
 
 recv_path = "/tracker_{}:vals:{}"
-send_path = "light{}/{}"
+send_path = "/light{}/{}"
 
 thread_runs = True
 
 
 def send_all(client: udp_client.SimpleUDPClient, x, y, z):
     for i in range(n_lights):
-        client.send_message(send_path.format(i + 1, "posx"), x)
-        client.send_message(send_path.format(i + 1, "posy"), y)
+        print(x, y)
+        client.send_message(send_path.format(i + 1, "xpos"), x)
+        client.send_message(send_path.format(i + 1, "ypos"), y)
         client.send_message(send_path.format(i + 1, "height"), z)
-        client.send_message(send_path.format(i + 1, "intensity"), 127)
+        client.send_message(send_path.format(i + 1, "intensity"), 0.8)
 
 
 def send_thread():
