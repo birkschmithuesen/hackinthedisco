@@ -12,9 +12,9 @@ To control the moving head lights send your data to the IP 192.168.0.10 (data-hu
 ![image info](./Hackinthedisco_Verschaltung.drawio.png)
 
 ## OSC namings
-* light[1-20]/intensity [0-255]
-* light[1-20]/color [0-255]
-* light[1-20]/frost [0-255]
-* light[1-20]/posx [0-255]
-* light[1-20]/posy [0-255]
-* light[1-20]/height [0-255]
+* light[1-20]/intensity [0-1]
+* light[1-20]/color [0-1]
+* light[1-20]/frost [0-1]
+* light[1-20]/posx [0-19] in m
+* light[1-20]/posy [0-8] in m
+* light[1-20]/height [0-3] in m
