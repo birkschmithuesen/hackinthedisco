@@ -6,7 +6,10 @@ from threading import Thread
 
 from time import sleep
 
-update_rate = 1 / 60
+update_rate = 1 / 10
+check_trackers_up_to = 15
+game_dim_x = 17.0
+game_dim_y = 10.0
 # from functools import partial
 
 
@@ -22,11 +25,12 @@ def print_compute_handler(unused_addr, args, volume):
 
 
 def handle_x(unused_addr, args, x_pos, *mehr_args):
-    position[0] = x_pos
+    ball_position[0] = x_pos
+    print(f"{unused_addr}, {args[0]}")
 
 
 def handle_y(unused_addr, args, y_pos, *mehr_args):
-    position[1] = y_pos
+    ball_position[1] = y_pos
 
 
 def handle_speed(unused_addr, args, speed, *mehr_args):
@@ -34,7 +38,8 @@ def handle_speed(unused_addr, args, speed, *mehr_args):
     pass
 
 
-position = [0, 0, 0]
+positions = []
+ball_position = [0, 0, 0]
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
@@ -62,11 +67,18 @@ def send_thread():
     client = udp_client.SimpleUDPClient(send_ip, send_port)
 
     while thread_runs:
-        send_all(client, *position)
+        #update_game()
+        #send_all(client, *ball_position)
         sleep(update_rate)
 
 
 if __name__ == "__main__":
+    # Init array of tracker positions
+    for i in range(1, check_trackers_up_to+1):
+        positions.append((0.0, 0.0))
+    print(positions)
+    sleep(10)
+
     dispatcher = Dispatcher()
     for i in range(1):
         dispatcher.map(recv_path.format(i + 1, "pos_x"), handle_x, i)
