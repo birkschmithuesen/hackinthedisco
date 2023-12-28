@@ -180,9 +180,17 @@ def send_thread():
 
 def ball_reset():
     # Reset the ball position to center and random direction
+    print(f"P1 {state.p1_points}, P2 {state.p2_points}")
     state.ball.x = game_dim_x / 2.0
     state.ball.y = game_dim_y / 2.0
-    random_angle = np.random.rand() * 2 * np.pi
+    state.ball_color = 0.0
+
+    # Limit angle to the side of players to prevent boring vertical bouncing
+    random_angle = np.random.rand() * np.deg2rad(90) + np.deg2rad(90)
+    if np.random.choice(a=[False, True]):
+        # Randomly decide player direction
+        random_angle += np.pi
+
     state.ball_speed.x = default_ball_speed * np.sin(random_angle)
     state.ball_speed.y = default_ball_speed * np.cos(random_angle)
 
@@ -190,16 +198,16 @@ def ball_reset():
 def ball_x_bounce():
     # Ball caught and bounce
     state.ball_speed.x *= -1
-    state.ball_color += 10
-    if state.ball_color >= 255:
-        state.ball_color = 0
+    state.ball_color += 1 / 20
+    if state.ball_color >= 1:
+        state.ball_color = 0.0
 
 
 def ball_y_bounce():
     state.ball_speed.y *= -1
-    state.ball_color += 10
-    if state.ball_color >= 255:
-        state.ball_color = 0
+    state.ball_color += 1 / 20
+    if state.ball_color >= 1:
+        state.ball_color = 0.0
 
 
 def update_game_state():
@@ -219,7 +227,6 @@ def update_game_state():
         else:
             # Ball missed respawn ball
             state.p2_points += 1
-            print(f"P1 {state.p1_points}, P2 {state.p2_points}")
             ball_reset()
 
         # Check if player 2 catched the ball
@@ -231,7 +238,6 @@ def update_game_state():
         else:
             # Ball missed respawn ball
             state.p1_points += 1
-            print(f"P1 {state.p1_points}, P2 {state.p2_points}")
             ball_reset()
 
 
