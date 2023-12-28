@@ -24,6 +24,9 @@ class pos:
     x: float = 0.0
     y: float = 0.0
 
+    def __add__(self, other):
+        return pos(self.x + other.x, self.y + other.y)
+
 
 @dataclass
 class GameState:
@@ -35,6 +38,7 @@ class GameState:
 state = GameState(p1=pos(1, 5), p2=pos(16, 5), ball=pos(game_dim_x / 2, game_dim_y / 2))
 player1_lights = [0, 1, 2, 3, 4]
 player2_lights = [15, 16, 17, 18, 19]
+ball_lights = [6, 7, 8, 11, 12, 13]
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
@@ -74,12 +78,18 @@ def plot_line(client, p: pos, lights):
         y += delta_y
 
 
+def plot_ball(client: udp_client.SimpleUDPClient):
+    for i in ball_lights:
+        client.send_message(send_path.format(i + 1, "xpos"), state.ball.x)
+        client.send_message(send_path.format(i + 1, "ypos"), state.ball.y)
+
+
 def send_game_state(client: udp_client.SimpleUDPClient):
     # send ball position to 2 leds
     # send left line to one half
     plot_line(client, state.p1, player1_lights)
     plot_line(client, state.p2, player2_lights)
-
+    plot_ball(client)
     # send right line to other half
     pass
 
@@ -91,6 +101,8 @@ def send_initial_state(client: udp_client.SimpleUDPClient):
     for i in player2_lights:
         client.send_message(send_path.format(i + 1, "intensity"), 0.8)
         client.send_message(send_path.format(i + 1, "xpos"), state.p2.x)
+    for i in ball_lights:
+        client.send_message(send_path.format(i + 1, "intensity"), 0.8)
 
 
 def send_all(client: udp_client.SimpleUDPClient, x, y, z):
