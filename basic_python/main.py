@@ -11,18 +11,20 @@ from enum import Enum
 
 update_rate = 1 / 10
 check_trackers_up_to = 15
-game_dim_x = 17.0           # in meters
-game_dim_y = 10.0           # in meters
-pedal_height = 2            # in meters
-win_threshold = 3           # number of points to win
+game_dim_x = 17.0  # in meters
+game_dim_y = 10.0  # in meters
+pedal_height = 2  # in meters
+win_threshold = 3  # number of points to win
 
 
 positions = []
- 
+
+
 class GameMode(Enum):
     WAIT = 0
     RUNNING = 1
     GAME_END = 2
+
 
 @dataclass
 class pos:
@@ -39,10 +41,19 @@ class GameState:
     p2: pos
     ball: pos
     ball_speed: pos
+    mode: GameMode
+    ball_color: int = 0
+    p1_points: int = 0
+    p2_points: int = 0
 
 
-state = GameState(p1=pos(1, 5), p2=pos(16, 5), ball=pos(game_dim_x / 2.0, game_dim_y / 2.0),
-                  ball_speed=pos(), mode=GameMode.RUNNING, p1_points=0, p2_points=0)
+state = GameState(
+    p1=pos(1, 5),
+    p2=pos(16, 5),
+    ball=pos(game_dim_x / 2.0, game_dim_y / 2.0),
+    ball_speed=pos(1, 0.1),
+    mode=GameMode.RUNNING,
+)
 
 default_ball_speed = 0.2
 player1_lights = [0, 1, 2, 3, 4]
@@ -150,40 +161,44 @@ def send_thread():
 
         sleep(update_rate)
 
+
 def ball_reset():
     # Reset the ball position to center and random direction
-    state.ball.x = game_dim_x/2
-    state.ball.y = game_dim_y/2
-    random_angle = np.random.rand()*2*np.pi
-    state.ball_speed.x = default_ball_speed*np.sin(random_angle)
-    state.ball_speed.y = default_ball_speed*np.cos(random_angle)
+    state.ball.x = game_dim_x / 2.0
+    state.ball.y = game_dim_y / 2.0
+    random_angle = np.random.rand() * 2 * np.pi
+    state.ball_speed.x = default_ball_speed * np.sin(random_angle)
+    state.ball_speed.y = default_ball_speed * np.cos(random_angle)
+
 
 def ball_x_bounce():
     # Ball caught and bounce
-    state.ball.x *= -1
-    ball_color += 10
-    if (ball_color >= 255):
-        ball_color = 0
+    state.ball_speed.x *= -1
+    state.ball_color += 10
+    if state.ball_color >= 255:
+        state.ball_color = 0
+
 
 def ball_y_bounce():
     state.ball_speed.y *= -1
-    ball_color += 10
-    if (ball_color >= 255):
-        ball_color = 0
+    state.ball_color += 10
+    if state.ball_color >= 255:
+        state.ball_color = 0
+
 
 def update_game_state():
     # Update ball positions
-    state.ball.x += state.ball_speed.x
-    state.ball.y += state.ball_speed.y
+    state.ball += state.ball_speed
 
     # Handle vertical reflections
-    if (state.ball.y <= 0 or state.ball.y >= game_dim_y):
+    if state.ball.y <= 0 or state.ball.y >= game_dim_y:
         ball_y_bounce()
 
     # Check if player 1 catched the ball
-    if (state.ball.x <= 0):
-        if (state.ball.y <= (state.p1.y+pedal_height/2) \
-            and  state.ball.y >= (state.p1.y-pedal_height/2)):
+    if state.ball.x <= state.p1.x:
+        if state.ball.y <= (state.p1.y + pedal_height / 2) and state.ball.y >= (
+            state.p1.y - pedal_height / 2
+        ):
             ball_x_bounce()
         else:
             # Ball missed respawn ball
@@ -192,16 +207,16 @@ def update_game_state():
             ball_reset()
 
         # Check if player 2 catched the ball
-    elif (state.ball.x >= game_dim_y):
-        if (state.ball.y <= (state.p2.y+pedal_height/2) \
-            and  state.ball.y >= (state.p2.y-pedal_height/2)):
+    elif state.ball.x >= state.p2.x:
+        if state.ball.y <= (state.p2.y + pedal_height / 2) and state.ball.y >= (
+            state.p2.y - pedal_height / 2
+        ):
             ball_x_bounce()
         else:
             # Ball missed respawn ball
             state.p1_points += 1
             print(f"P1 {state.p1_points}, P2 {state.p2_points}")
             ball_reset()
-
 
 
 if __name__ == "__main__":
