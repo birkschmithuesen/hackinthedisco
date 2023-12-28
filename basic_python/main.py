@@ -9,11 +9,11 @@ import numpy as np
 from dataclasses import dataclass, field
 from enum import Enum
 
-update_rate = 1 / 10
+update_rate = 1 / 20
 check_trackers_up_to = 15
 game_dim_x = 17.0  # in meters
 game_dim_y = 10.0  # in meters
-pedal_height = 2  # in meters
+pedal_height = 3.5  # in meters
 win_threshold = 3  # number of points to win
 
 
@@ -62,9 +62,9 @@ ball_lights = [6, 7, 8, 11, 12, 13]
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
-send_ip = "127.0.0.1"
-# send_ip = "192.168.0.232"
-send_port = 10009
+# send_ip = "127.0.0.1"
+send_ip = "192.168.0.232"
+send_port = 12344
 
 n_trackers = 15
 n_lights = 20
@@ -142,11 +142,11 @@ def get_player_position(x_lower, x_upper):
     return -1
 
 
-def update_game_state():
-    player1_position = get_player_position(0, 2)
+def update_player_positions():
+    player1_position = get_player_position(0, state.p1.x + 2)
     if player1_position != -1:
         state.p1.y = player1_position
-    player2_position = get_player_position(15, 17)
+    player2_position = get_player_position(state.p2.x - 2, game_dim_x)
     if player2_position != -1:
         state.p2.y = player2_position
     # calculate ball position here
@@ -156,6 +156,7 @@ def send_thread():
     client = udp_client.SimpleUDPClient(send_ip, send_port)
     send_initial_state(client=client)
     while thread_runs:
+        update_player_positions()
         update_game_state()
         send_game_state(client)
 

@@ -18,7 +18,7 @@ plt.style.use("dark_background")
 local_ip = "127.0.0.1"
 
 
-local_port = 10009
+local_port = 12344
 
 
 dispatcher = dispatcher.Dispatcher()
