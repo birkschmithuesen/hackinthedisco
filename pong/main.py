@@ -60,6 +60,9 @@ default_ball_speed = 0.2
 player1_lights = [0, 1, 2, 3, 4]
 player2_lights = [15, 16, 17, 18, 19]
 ball_lights = [6, 7, 8, 11, 12, 13]
+player_1_point_lights = [5, 9]
+player_2_point_lights = [10, 14]
+
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
@@ -90,7 +93,7 @@ def handle_speed(unused_addr, args, speed, *mehr_args):
     pass
 
 
-def plot_line(p: pos, lights):
+def draw_line(p: pos, lights):
     line_r = pedal_height / 2
     y = p.y
     y = y - line_r
@@ -100,17 +103,29 @@ def plot_line(p: pos, lights):
         y += delta_y
 
 
-def plot_ball():
+def draw_ball():
     set_ypos(ball_lights, state.ball.y)
     set_xpos(ball_lights, state.ball.x)
+
+
+def draw_points():
+    # TODO current x coordinate makes no sense, fix that!
+    for point_lights, x in zip(
+        [player_1_point_lights, player_2_point_lights],
+        [state.p1_points, state.p2_points],
+    ):
+        for light, y in zip(point_lights, [0, game_dim_y]):
+            set_ypos(light, y)
+            set_xpos(light, x)
 
 
 def send_game_state():
     # send ball position to 2 leds
     # send left line to one half
-    plot_line(state.p1, player1_lights)
-    plot_line(state.p2, player2_lights)
-    plot_ball()
+    draw_line(state.p1, player1_lights)
+    draw_line(state.p2, player2_lights)
+    draw_ball()
+    draw_points()
     # send right line to other half
     pass
 
@@ -118,29 +133,34 @@ def send_game_state():
 def set_intensity(lights: list, intensity: float):
     if type(lights) == int:
         lights = [lights]
+    print(lights)
     for l in lights:
-        client.send_message(send_path.format(i + 1, "intensity"), intensity)
+        client.send_message(send_path.format(l + 1, "intensity"), intensity)
 
 
 def set_xpos(lights: list, xpos: float):
     if type(lights) == int:
         lights = [lights]
+    print(lights)
+
     for l in lights:
-        client.send_message(send_path.format(i + 1, "xpos"), xpos)
+        client.send_message(send_path.format(l + 1, "xpos"), xpos)
 
 
 def set_ypos(lights: list, ypos: float):
     if type(lights) == int:
         lights = [lights]
+    print(lights)
+
     for l in lights:
-        client.send_message(send_path.format(i + 1, "ypos"), ypos)
+        client.send_message(send_path.format(l + 1, "ypos"), ypos)
 
 
 def set_color(lights: list, color: float):
     if type(lights) == int:
         lights = [lights]
     for l in lights:
-        client.send_message(send_path.format(i + 1, "color"), color)
+        client.send_message(send_path.format(l + 1, "color"), color)
 
 
 def send_initial_state():
@@ -186,7 +206,10 @@ def ball_reset():
     state.ball_color = 0.0
 
     # Limit angle to the side of players to prevent boring vertical bouncing
-    random_angle = np.random.rand() * np.deg2rad(90) + np.deg2rad(90)
+    opening_angle = 120.0
+    random_angle = np.random.rand() * np.deg2rad(opening_angle) - np.deg2rad(
+        90 + opening_angle / 2
+    )
     if np.random.choice(a=[False, True]):
         # Randomly decide player direction
         random_angle += np.pi
