@@ -4,12 +4,14 @@ from pythonosc.dispatcher import Dispatcher
 from pythonosc import osc_server, udp_client
 from threading import Thread
 
-from time import sleep
+from time import sleep, time
+import numpy as np
 
 update_rate = 1 / 10
 check_trackers_up_to = 15
 game_dim_x = 17.0
 game_dim_y = 10.0
+game_pedal_height = 2.0
 update_rate = 1 / 20
 # from functools import partial
 
@@ -40,7 +42,10 @@ def handle_speed(unused_addr, args, speed, *mehr_args):
 
 
 positions = []
-ball_position = [0, 0, 0]
+ball_position = [0, 0, 0]   # X, Y positions
+default_ball_speed = 0.2    
+ball_speed = [0.1, 0.1]     # X, Y speeds
+ball_color = 0              # Color value 0-255
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
@@ -70,9 +75,40 @@ def send_thread():
     client = udp_client.SimpleUDPClient(send_ip, send_port)
 
     while thread_runs:
-        #update_game()
+        update_game()
         #send_all(client, *ball_position)
         sleep(update_rate)
+
+def update_game():
+    # Update ball positions
+    ball_position[0] += ball_speed[0]
+    ball_position[1] += ball_speed[1]
+
+    # Handle vertical reflections
+    if (ball_position[1] <= 0 or ball_position[1] >= game_dim_y):
+        ball_speed[1] *= -1
+        ball_color += 10
+        if (ball_color >= 255):
+            ball_color = 0
+
+    # Check if player 1 catched the ball
+    if (ball_position[0] <= 0):
+        if (ball_position[1] <= (player1_positions[1]+game_pedal_height/2) \
+            and  ball_position[1] >= (player1_positions[1]-game_pedal_height/2)):
+            # Ball caught and bounce
+            ball_speed[0] *= -1
+            ball_color += 10
+            if (ball_color >= 255):
+                ball_color = 0
+        else:
+            # Ball missed respawn ball
+            ball_position[0] = game_dim_x/2
+            ball_position[1] = game_dim_y/2
+            random_angle = np.random.rand()*2*np.pi
+            ball_speed[0] = default_ball_speed*np.sin(random_angle)
+            ball_speed[1] = default_ball_speed*np.cos(random_angle)
+
+
 
 
 if __name__ == "__main__":
