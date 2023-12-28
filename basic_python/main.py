@@ -9,6 +9,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from enum import Enum
 
+
 update_rate = 1 / 20
 check_trackers_up_to = 15
 game_dim_x = 17.0  # in meters
@@ -62,8 +63,8 @@ ball_lights = [6, 7, 8, 11, 12, 13]
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
-# send_ip = "127.0.0.1"
-send_ip = "192.168.0.232"
+send_ip = "127.0.0.1"
+# send_ip = "192.168.0.232"
 send_port = 12344
 
 n_trackers = 15
@@ -73,6 +74,7 @@ recv_path = "/tracker_{}:vals:{}"
 send_path = "/light{}/{}"
 
 thread_runs = True
+client = udp_client.SimpleUDPClient(send_ip, send_port)
 
 
 def handle_x(unused_addr, args, x_pos, *mehr_args):
@@ -88,77 +90,90 @@ def handle_speed(unused_addr, args, speed, *mehr_args):
     pass
 
 
-def plot_line(client, p: pos, lights):
+def plot_line(p: pos, lights):
     line_r = pedal_height / 2
-    y = min(max(p.y, line_r), (game_dim_y - line_r))
+    y = p.y
     y = y - line_r
     delta_y = pedal_height / (len(lights) - 1)
     for i in lights:
-        client.send_message(send_path.format(i + 1, "ypos"), y)
+        set_ypos(i, y)
         y += delta_y
 
 
-def plot_ball(client: udp_client.SimpleUDPClient):
-    for i in ball_lights:
-        client.send_message(send_path.format(i + 1, "xpos"), state.ball.x)
-        client.send_message(send_path.format(i + 1, "ypos"), state.ball.y)
+def plot_ball():
+    set_ypos(ball_lights, state.ball.y)
+    set_xpos(ball_lights, state.ball.x)
 
 
-def send_game_state(client: udp_client.SimpleUDPClient):
+def send_game_state():
     # send ball position to 2 leds
     # send left line to one half
-    plot_line(client, state.p1, player1_lights)
-    plot_line(client, state.p2, player2_lights)
-    plot_ball(client)
+    plot_line(state.p1, player1_lights)
+    plot_line(state.p2, player2_lights)
+    plot_ball()
     # send right line to other half
     pass
 
 
-def send_initial_state(client: udp_client.SimpleUDPClient):
-    for i in player1_lights:
-        client.send_message(send_path.format(i + 1, "intensity"), 0.8)
-        client.send_message(send_path.format(i + 1, "xpos"), state.p1.x)
-    for i in player2_lights:
-        client.send_message(send_path.format(i + 1, "intensity"), 0.8)
-        client.send_message(send_path.format(i + 1, "xpos"), state.p2.x)
-    for i in ball_lights:
-        client.send_message(send_path.format(i + 1, "intensity"), 0.8)
+def set_intensity(lights: list, intensity: float):
+    if type(lights) == int:
+        lights = [lights]
+    for l in lights:
+        client.send_message(send_path.format(i + 1, "intensity"), intensity)
 
 
-def send_all(client: udp_client.SimpleUDPClient, x, y, z):
-    for i in range(n_lights):
-        print(x, y)
-        client.send_message(send_path.format(i + 1, "xpos"), x)
-        client.send_message(send_path.format(i + 1, "ypos"), y)
-        client.send_message(send_path.format(i + 1, "height"), z)
-        client.send_message(send_path.format(i + 1, "intensity"), 0.8)
+def set_xpos(lights: list, xpos: float):
+    if type(lights) == int:
+        lights = [lights]
+    for l in lights:
+        client.send_message(send_path.format(i + 1, "xpos"), xpos)
+
+
+def set_ypos(lights: list, ypos: float):
+    if type(lights) == int:
+        lights = [lights]
+    for l in lights:
+        client.send_message(send_path.format(i + 1, "ypos"), ypos)
+
+
+def set_color(lights: list, color: float):
+    if type(lights) == int:
+        lights = [lights]
+    for l in lights:
+        client.send_message(send_path.format(i + 1, "color"), color)
+
+
+def send_initial_state():
+    set_intensity(player1_lights + player2_lights + ball_lights, 0.8)
+    set_xpos(player1_lights, state.p1.x)
+    set_xpos(player2_lights, state.p2.x)
 
 
 def get_player_position(x_lower, x_upper):
+    line_r = pedal_height / 2
     for i, p in enumerate(positions):
         if not (p.x == 0 and p.y == 0) and x_lower <= p.x <= x_upper:
-            return p.y
+            return min(max(p.y, line_r), (game_dim_y - line_r))
 
     return -1
 
 
 def update_player_positions():
-    player1_position = get_player_position(0, state.p1.x + 2)
+    player1_position = get_player_position(-np.inf, state.p1.x + 2)
     if player1_position != -1:
         state.p1.y = player1_position
-    player2_position = get_player_position(state.p2.x - 2, game_dim_x)
+    player2_position = get_player_position(state.p2.x - 2, np.inf)
     if player2_position != -1:
         state.p2.y = player2_position
     # calculate ball position here
 
 
 def send_thread():
-    client = udp_client.SimpleUDPClient(send_ip, send_port)
-    send_initial_state(client=client)
+    send_initial_state()
     while thread_runs:
         update_player_positions()
         update_game_state()
-        send_game_state(client)
+        send_game_state()
 
         sleep(update_rate)
 
