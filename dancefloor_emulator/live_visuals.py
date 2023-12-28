@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.colors import hsv_to_rgb
 from pythonosc import dispatcher, osc_server, udp_client
 from typing import List, Any
 import numpy as np
@@ -39,17 +40,16 @@ def intensity_handler(address: str, fixed_argument, *osc_arguments):
 
 
 def color_handler(address: str, fixed_argument, *osc_arguments):
-    print(osc_arguments[0])
-
     channel_positions[3, fixed_argument[0]] = osc_arguments[0]
 
 
 def plot(*args):
     ax.clear()
-
+    colors = [hsv_to_rgb([c, 1, 1]) for c in channel_positions[3]]
     plt.scatter(
         channel_positions[0],
         channel_positions[1],
+        color=colors,
         alpha=np.clip(channel_positions[2], 0, 1),
         s=80,
     )
@@ -80,7 +80,7 @@ dispatcher.set_default_handler(default_handler)
 
 
 fig, ax = plt.subplots()
-ani = FuncAnimation(fig, plot, interval=int(1000 / 10), save_count=10)
+ani = FuncAnimation(fig, plot, interval=int(1000 / 20), save_count=10)
 
 
 server = osc_server.BlockingOSCUDPServer((local_ip, local_port), dispatcher)

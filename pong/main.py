@@ -52,7 +52,7 @@ state = GameState(
     p1=pos(1, 5),
     p2=pos(16, 5),
     ball=pos(game_dim_x / 2.0, game_dim_y / 2.0),
-    ball_speed=pos(1, 0.1),
+    ball_speed=pos(0.2, 0),
     mode=GameMode.RUNNING,
 )
 
@@ -103,9 +103,18 @@ def draw_line(p: pos, lights):
         y += delta_y
 
 
-def draw_ball():
-    set_ypos(ball_lights, state.ball.y)
-    set_xpos(ball_lights, state.ball.x)
+def draw_ball(p: pos, lights, color, rad=1, move_speed=1):
+    x = np.ones(len(lights)) * rad
+
+    t = time()
+
+    theta = np.linspace(0, 2 * np.pi, len(lights)) + t * move_speed
+    x_new = np.cos(theta) * x
+    y_new = np.sin(theta) * x
+
+    set_ypos_arr(lights, y_new + p.y)
+    set_xpos_arr(lights, x_new + p.x)
+    set_color(lights, color)
 
 
 def draw_points():
@@ -124,7 +133,12 @@ def send_game_state():
     # send left line to one half
     draw_line(state.p1, player1_lights)
     draw_line(state.p2, player2_lights)
-    draw_ball()
+
+    center_x = game_dim_x / 2
+    mod = (center_x - np.abs(center_x - state.ball.x)) / center_x * 2
+    draw_ball(
+        state.ball, ball_lights, (state.ball_color + mod * 0.2) % 1, mod, mod * 0.2
+    )
     draw_points()
     # send right line to other half
     pass
@@ -154,6 +168,16 @@ def set_ypos(lights: list, ypos: float):
 
     for l in lights:
         client.send_message(send_path.format(l + 1, "ypos"), ypos)
+
+
+def set_ypos_arr(lights: list, ypos: float):
+    for l, y in zip(lights, ypos):
+        client.send_message(send_path.format(l + 1, "ypos"), y)
+
+
+def set_xpos_arr(lights: list, xpos: float):
+    for l, x in zip(lights, xpos):
+        client.send_message(send_path.format(l + 1, "xpos"), x)
 
 
 def set_color(lights: list, color: float):
