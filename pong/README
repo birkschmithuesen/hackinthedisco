@@ -1,0 +1,21 @@
+# Light-Pong
+
+This is the classic game of pong, rebuilt for lidar sensors and moving heads.
+
+The position of the players are controlled by the position of the players, the ball is a ball of light.
+
+The players have to position within a zone of a certain side on their side of the playing field.
+
+
+## Installation and Setup
+setup by installing the requirements in a new python virtual environment
+``` bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+set the ip address and the port of the light controller using the variables in the beginning of the pong.py
+
+
+start the game with `python pong.py`

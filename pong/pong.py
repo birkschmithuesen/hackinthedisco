@@ -9,19 +9,33 @@ import numpy as np
 from pythonosc import osc_server, udp_client
 from pythonosc.dispatcher import Dispatcher
 
+## EDIT THESE VARIABLES FOR YOUR SETUP
+# OSC listener for tracker data
+listen_ip = "0.0.0.0"
+listen_port = 10000
 
-update_rate = 1 / 30  # in 1/frequency (Hz)
+# OSC client for controlling lights
+send_ip = "127.0.0.1"  # local debug
+# send_ip = "192.168.0.232"   # production server
+send_port = 12344
+
+# OSC Triggers are sent to this address for triggering audio samples
+audio_send_ip = "192.168.0.230"
+audio_send_port = 1000
 
 n_trackers = 15
 n_lights = 20
 
+update_rate = 1 / 30  # in 1/frequency (Hz)
+
 game_dim_x = 17.0  # in meters
-y_dim_offset = (
-    0  # used if the playing field is offset in relation to the coordinate system
-)
-game_dim_y = 6.5 - y_dim_offset  # in meters
+y_dim_offset = 0  # offset of playing field border to x axis
+game_dim_y = 10 - y_dim_offset  # in meters
+
 paddle_height = 2  # in meters
-paddle_offset = 2  # x-distance from paddle to edge of playing field
+paddle_offset = 2  # x-distance from paddles to edge of playing field
+
+player_detection_zone_width = 5
 
 win_threshold = 4  # number of points to win
 
@@ -43,18 +57,6 @@ all_lights = (
     + player_2_score_lights
 )
 
-# OSC listener for tracker data
-listen_ip = "0.0.0.0"
-listen_port = 10000
-
-# OSC client for controlling lights
-send_ip = "127.0.0.1"  # local debug
-# send_ip = "192.168.0.232"   # production server
-send_port = 12344
-
-# OSC Triggers are sent to this address for triggering audio samples
-audio_send_ip = "192.168.0.230"
-audio_send_port = 1000
 
 # OSC paths for sending and receiving
 recv_path = "/tracker_{}:vals:{}"
@@ -262,10 +264,12 @@ def get_player_position(x_lower, x_upper):
 
 
 def update_player_positions():
-    player1_position = get_player_position(-np.inf, state.p1.x + 4)
+    player1_position = get_player_position(-np.inf, player_detection_zone_width)
     if player1_position != -1:
         state.p1.y = player1_position
-    player2_position = get_player_position(state.p2.x - 4, np.inf)
+    player2_position = get_player_position(
+        game_dim_x - player_detection_zone_width, np.inf
+    )
     if player2_position != -1:
         state.p2.y = player2_position
 
