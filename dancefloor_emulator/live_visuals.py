@@ -1,32 +1,23 @@
+from threading import Thread
+
 import matplotlib.pyplot as plt
 from matplotlib.colors import hsv_to_rgb
 from pythonosc import dispatcher, osc_server, udp_client
-from typing import List, Any
 import numpy as np
 from matplotlib.animation import FuncAnimation
-from threading import Thread
-import logging
-
-logFormat = "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]: %(message)s"
-timeFormat = "%Y-%m-%d %H:%M:%S"
-logging.basicConfig(format=logFormat, datefmt=timeFormat, level=logging.INFO)
 
 
 plt.style.use("dark_background")
 
-# taunus_ip = "130.149.23.24"
-# local_ip = "130.149.23.218"
-local_ip = "127.0.0.1"
-
-
+local_ip = "0.0.0.0"
 local_port = 12344
 
 
-dispatcher = dispatcher.Dispatcher()
 N_CHANNELS = 20
 channel_positions = np.zeros((4, N_CHANNELS))
 
 
+# incoming OSC handlers
 def x_handler(address: str, fixed_argument, *osc_arguments):
     channel_positions[0, fixed_argument[0]] = osc_arguments[0]
 
@@ -69,6 +60,8 @@ def default_handler(address, *args):
 
 send_path = "/light{}/{}"
 
+
+dispatcher = dispatcher.Dispatcher()
 
 for i in range(N_CHANNELS):
     dispatcher.map(send_path.format(i + 1, "xpos"), x_handler, i)

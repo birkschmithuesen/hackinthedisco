@@ -1,24 +1,69 @@
 import math
 
-from pythonosc.dispatcher import Dispatcher
-from pythonosc import osc_server, udp_client
-from threading import Thread
-
-from time import sleep, time
-import numpy as np
 from dataclasses import dataclass, field
 from enum import Enum
+from threading import Thread
+from time import sleep, time
+
+import numpy as np
+from pythonosc import osc_server, udp_client
+from pythonosc.dispatcher import Dispatcher
 
 
-update_rate = 1 / 30
-check_trackers_up_to = 15
+update_rate = 1 / 30  # in 1/frequency (Hz)
+
+n_trackers = 15
+n_lights = 20
+
 game_dim_x = 17.0  # in meters
-y_dim_offset = 1
+y_dim_offset = (
+    0  # used if the playing field is offset in relation to the coordinate system
+)
 game_dim_y = 6.5 - y_dim_offset  # in meters
-pedal_height = 2  # in meters
-win_threshold = 4  # number of points to win
-paddle_offset = 2
+paddle_height = 2  # in meters
+paddle_offset = 2  # x-distance from paddle to edge of playing field
 
+win_threshold = 4  # number of points to win
+
+
+default_ball_speed = 0.05  # relative to update_rate
+ball_opening_angle = 120.0  # start angle after ball reset to player side
+
+# lists of lights, these are the indices of the corresponding ids in the OSC paths
+player1_lights = [0, 1, 2, 3, 4]
+player2_lights = [15, 16, 17, 18, 19]
+ball_lights = [6, 7, 8, 11, 12, 13]
+player_1_score_lights = [5, 9]
+player_2_score_lights = [10, 14]
+all_lights = (
+    ball_lights
+    + player1_lights
+    + player2_lights
+    + player_1_score_lights
+    + player_2_score_lights
+)
+
+# OSC listener for tracker data
+listen_ip = "0.0.0.0"
+listen_port = 10000
+
+# OSC client for controlling lights
+send_ip = "127.0.0.1"  # local debug
+# send_ip = "192.168.0.232"   # production server
+send_port = 12344
+
+# OSC Triggers are sent to this address for triggering audio samples
+audio_send_ip = "192.168.0.230"
+audio_send_port = 1000
+
+# OSC paths for sending and receiving
+recv_path = "/tracker_{}:vals:{}"
+send_path = "/light{}/{}"
+
+# boolean for stopping the game thread
+thread_runs = True
+
+# holds all tracker positions
 positions = []
 
 
@@ -44,44 +89,15 @@ class GameState:
     ball: pos
     ball_speed: pos
     mode: GameMode
-    ball_color: int = 0
+    ball_color: float = 0  # Color value of the ball, mapping between the number and the actual color is beyond the scope of this work
     p1_points: int = 0
     p2_points: int = 0
-    ball_rotation: float = 0.0
+    ball_rotation: float = (
+        0.0  # the ball lights get rotated by this continuously incrementing value
+    )
     time_game_end: float = 0.0
 
 
-default_ball_speed = 0.05
-
-player1_lights = [0, 1, 2, 3, 4]
-player2_lights = [15, 16, 17, 18, 19]
-ball_lights = [6, 7, 8, 11, 12, 13]
-player_1_point_lights = [5, 9]
-player_2_point_lights = [10, 14]
-all_lights = (
-    ball_lights
-    + player1_lights
-    + player2_lights
-    + player_1_point_lights
-    + player_2_point_lights
-)
-
-listen_ip = "0.0.0.0"
-listen_port = 10000
-# send_ip = "127.0.0.1"
-send_ip = "192.168.0.232"
-send_port = 12344
-
-audio_send_ip = "192.168.0.230"
-audio_send_port = 1000
-
-n_trackers = 15
-n_lights = 20
-
-recv_path = "/tracker_{}:vals:{}"
-send_path = "/light{}/{}"
-
-thread_runs = True
 client = udp_client.SimpleUDPClient(send_ip, send_port)
 audio_client = udp_client.SimpleUDPClient(audio_send_ip, audio_send_port)
 
@@ -151,21 +167,19 @@ def send_sound(path):
 
 # Higher Level Draw Functions
 def draw_line(p: pos, lights):
-    line_r = pedal_height / 2
-    y = p.y
-    y = y - line_r
-    delta_y = pedal_height / (len(lights) - 1)
+    y = p.y - paddle_height / 2
+    delta_y = paddle_height / (len(lights) - 1)
     for i in lights:
         set_ypos(i, y)
         set_xpos(i, p.x)
         y += delta_y
 
 
-def draw_ball(p: pos, lights, color, rad=1, move_speed=1):
-    x = np.ones(len(lights)) * rad
+# lights are placed in a circular shape around p
+def draw_ball(p: pos, lights, color, radius=1, rotation_speed=1):
+    x = np.ones(len(lights)) * radius
 
-    # t = time()
-    state.ball_rotation += move_speed
+    state.ball_rotation += rotation_speed
     theta = np.linspace(0, 2 * np.pi, len(lights)) + state.ball_rotation
     x_new = np.cos(theta) * x
     y_new = np.sin(theta) * x
@@ -175,18 +189,18 @@ def draw_ball(p: pos, lights, color, rad=1, move_speed=1):
     set_color(lights, color)
 
 
-def draw_points():
+def draw_score():
     step_size = game_dim_x / 2 / win_threshold
-    for point_lights, x in zip(
-        [player_1_point_lights, player_2_point_lights],
-        [step_size * state.p1_points, game_dim_x - step_size * state.p2_points],
-    ):
-        for light, y in zip(point_lights, [0, game_dim_y]):
+    for score_lights, x in [
+        (player_1_score_lights, step_size * state.p1_points),
+        (player_2_score_lights, game_dim_x - step_size * state.p2_points),
+    ]:
+        for light, y in zip(score_lights, [0, game_dim_y]):
             set_ypos(light, y)
             set_xpos(light, x)
 
 
-#
+# call the relevant draw functions for the current game mode
 def send_game_state():
     if state.mode == GameMode.RUNNING:
         draw_line(state.p1, player1_lights)
@@ -197,7 +211,7 @@ def send_game_state():
         draw_ball(
             state.ball, ball_lights, (state.ball_color + mod * 0.3) % 1, mod, mod * 0.4
         )
-        draw_points()
+        draw_score()
 
     elif state.mode == GameMode.GAME_END:
         winner = state.p1 if state.p1_points >= win_threshold else state.p2
@@ -220,30 +234,26 @@ def send_game_state():
         set_intensity(all_lights[n_winner_lights:], 0)
 
 
-def initialize_lamps():
+# reset all lights to an off position (to ensure there is movement at the start of the program)
+def initialize_lights():
     set_intensity(all_lights, 0)
     set_color(all_lights, 0)
     set_xpos(all_lights, game_dim_x / 2)
     set_ypos(all_lights, game_dim_y / 2)
 
 
+# set initial positions and colors for
 def send_initial_state():
-    set_intensity(
-        player1_lights
-        + player2_lights
-        + ball_lights
-        + player_1_point_lights
-        + player_2_point_lights,
-        0.8,
-    )
+    set_intensity(all_lights, 0.8)
     set_xpos(player1_lights, state.p1.x)
     set_xpos(player2_lights, state.p2.x)
-    set_color(player_1_point_lights + player_2_point_lights, 0.2)
+    set_color(player_1_score_lights + player_2_score_lights, 0.2)
     set_color(player1_lights + player2_lights, 0.3)
 
 
+# return y of the first tracker position in the given x range
 def get_player_position(x_lower, x_upper):
-    line_r = pedal_height / 2
+    line_r = paddle_height / 2
     for i, p in enumerate(positions):
         if not (p.x == 0 and p.y == 0) and x_lower <= p.x <= x_upper:
             return min(max(p.y, line_r), (game_dim_y - line_r))
@@ -252,15 +262,15 @@ def get_player_position(x_lower, x_upper):
 
 
 def update_player_positions():
-    player1_position = get_player_position(-np.inf, state.p1.x + 2)
+    player1_position = get_player_position(-np.inf, state.p1.x + 4)
     if player1_position != -1:
         state.p1.y = player1_position
-    player2_position = get_player_position(state.p2.x - 2, np.inf)
+    player2_position = get_player_position(state.p2.x - 4, np.inf)
     if player2_position != -1:
         state.p2.y = player2_position
-    # calculate ball position here
 
 
+# this thread handles updating the games state and sending the update to the lights
 def send_thread():
     send_initial_state()
     while thread_runs:
@@ -271,11 +281,10 @@ def send_thread():
         sleep(update_rate)
 
 
+# set ball speed to a random angle, that is also limited to prevent boring vertical bouncing
 def setup_initial_ball_speed():
-    # Limit angle to the side of players to prevent boring vertical bouncing
-    opening_angle = 120.0
-    random_angle = np.random.rand() * np.deg2rad(opening_angle) - np.deg2rad(
-        90 + opening_angle / 2
+    random_angle = np.random.rand() * np.deg2rad(ball_opening_angle) - np.deg2rad(
+        90 + ball_opening_angle / 2
     )
     if np.random.choice(a=[False, True]):
         # Randomly decide player direction
@@ -287,8 +296,8 @@ def setup_initial_ball_speed():
     )
 
 
+# Reset the ball position to center and random direction. also handle game winning plays
 def ball_reset():
-    # Reset the ball position to center and random direction
     if state.p1_points >= win_threshold or state.p2_points >= win_threshold:
         state.mode = GameMode.GAME_END
         state.time_game_end = time()
@@ -301,19 +310,21 @@ def ball_reset():
     state.ball_speed = setup_initial_ball_speed()
 
 
+# Ball caught and bounce
 def ball_x_bounce():
-    # Ball caught and bounce
     state.ball_speed.x *= -1
     state.ball_color = (state.ball_color + 1 / 20) % 1.0
     send_sound("/bounce")
 
 
+# ball bounce of walls
 def ball_y_bounce():
     state.ball_speed.y *= -1
     state.ball_color = (state.ball_color + 1 / 20) % 1.0
     send_sound("/wallbounce")
 
 
+# main game logic
 def update_game_state():
     if state.mode == GameMode.RUNNING:
         # Update ball positions
@@ -325,8 +336,8 @@ def update_game_state():
 
         # Check if player 1 catched the ball
         if state.ball.x <= state.p1.x:
-            if state.ball.y <= (state.p1.y + pedal_height / 2) and state.ball.y >= (
-                state.p1.y - pedal_height / 2
+            if state.ball.y <= (state.p1.y + paddle_height / 2) and state.ball.y >= (
+                state.p1.y - paddle_height / 2
             ):
                 ball_x_bounce()
             else:
@@ -336,8 +347,8 @@ def update_game_state():
 
             # Check if player 2 catched the ball
         elif state.ball.x >= state.p2.x:
-            if state.ball.y <= (state.p2.y + pedal_height / 2) and state.ball.y >= (
-                state.p2.y - pedal_height / 2
+            if state.ball.y <= (state.p2.y + paddle_height / 2) and state.ball.y >= (
+                state.p2.y - paddle_height / 2
             ):
                 ball_x_bounce()
             else:
@@ -353,20 +364,19 @@ def update_game_state():
 
 if __name__ == "__main__":
     # Init array of tracker positions
-    initialize_lamps()
-    for i in range(1, check_trackers_up_to + 1):
+    initialize_lights()
+    for i in range(1, n_trackers + 1):
         positions.append(pos())
-    print(positions)
 
     state = GameState(
-        p1=pos(paddle_offset, 5),
-        p2=pos(game_dim_x - paddle_offset, 5),
+        p1=pos(paddle_offset, game_dim_y / 2),
+        p2=pos(game_dim_x - paddle_offset, game_dim_y / 2),
         ball=pos(game_dim_x / 2.0, game_dim_y / 2.0),
-        # ball_speed=pos(0.2, 0),
         ball_speed=setup_initial_ball_speed(),
         mode=GameMode.RUNNING,
     )
 
+    # subscribe OSC listener to trackers
     dispatcher = Dispatcher()
     for i in range(n_trackers):
         dispatcher.map(recv_path.format(i + 1, "pos_x"), handle_x, i)

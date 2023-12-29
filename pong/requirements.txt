@@ -1,0 +1,2 @@
+python-osc
+numpy
