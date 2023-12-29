@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
-update_rate = 1 / 60
+update_rate = 1 / 30
 check_trackers_up_to = 15
 game_dim_x = 17.0  # in meters
 y_dim_offset = 1
@@ -68,8 +68,8 @@ all_lights = (
 
 listen_ip = "0.0.0.0"
 listen_port = 10000
-send_ip = "127.0.0.1"
-# send_ip = "192.168.0.232"
+# send_ip = "127.0.0.1"
+send_ip = "192.168.0.232"
 send_port = 12344
 
 audio_send_ip = "192.168.0.230"
@@ -104,7 +104,6 @@ def handle_speed(unused_addr, args, speed, *mehr_args):
 def set_intensity(lights: list, intensity: float):
     if type(lights) == int:
         lights = [lights]
-    print(lights)
     for l in lights:
         client.send_message(send_path.format(l + 1, "intensity"), intensity)
 
@@ -112,7 +111,6 @@ def set_intensity(lights: list, intensity: float):
 def set_xpos(lights: list, xpos: float):
     if type(lights) == int:
         lights = [lights]
-    print(lights)
 
     for l in lights:
         client.send_message(send_path.format(l + 1, "xpos"), xpos)
@@ -121,7 +119,6 @@ def set_xpos(lights: list, xpos: float):
 def set_ypos(lights: list, ypos: float):
     if type(lights) == int:
         lights = [lights]
-    print(lights)
 
     for l in lights:
         client.send_message(send_path.format(l + 1, "ypos"), ypos + y_dim_offset)
@@ -145,7 +142,11 @@ def set_color(lights: list, color: float):
 
 
 def send_sound(path):
-    audio_client.send_message(path, True)
+    try:
+        audio_client.send_message(path, True)
+        audio_client.send_message(path, False)
+    except Exception:
+        print("can't send audio osc well shit")
 
 
 # Higher Level Draw Functions
@@ -194,7 +195,7 @@ def send_game_state():
         center_x = game_dim_x / 2
         mod = (center_x - np.abs(center_x - state.ball.x)) / center_x
         draw_ball(
-            state.ball, ball_lights, (state.ball_color + mod * 0.4) % 1, mod, mod * 0.4
+            state.ball, ball_lights, (state.ball_color + mod * 0.3) % 1, mod, mod * 0.4
         )
         draw_points()
 
@@ -209,8 +210,21 @@ def send_game_state():
         n_winner_lights = int(
             round(winner_points / (winner_points + loser_points) * n_lights)
         )
-        draw_ball(winner, all_lights[:n_winner_lights], state.ball_rotation % 1, 2, 2.1)
+        draw_ball(
+            winner,
+            all_lights[:n_winner_lights],
+            (state.ball_rotation % 100) / 100,
+            2,
+            2.1,
+        )
         set_intensity(all_lights[n_winner_lights:], 0)
+
+
+def initialize_lamps():
+    set_intensity(all_lights, 0)
+    set_color(all_lights, 0)
+    set_xpos(all_lights, game_dim_x / 2)
+    set_ypos(all_lights, game_dim_y / 2)
 
 
 def send_initial_state():
@@ -297,6 +311,7 @@ def ball_x_bounce():
 def ball_y_bounce():
     state.ball_speed.y *= -1
     state.ball_color = (state.ball_color + 1 / 20) % 1.0
+    send_sound("/wallbounce")
 
 
 def update_game_state():
@@ -338,6 +353,7 @@ def update_game_state():
 
 if __name__ == "__main__":
     # Init array of tracker positions
+    initialize_lamps()
     for i in range(1, check_trackers_up_to + 1):
         positions.append(pos())
     print(positions)
