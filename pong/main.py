@@ -15,7 +15,7 @@ check_trackers_up_to = 15
 game_dim_x = 17.0  # in meters
 game_dim_y = 10.0  # in meters
 pedal_height = 3.5  # in meters
-win_threshold = 1  # number of points to win
+win_threshold = 4  # number of points to win
 
 
 positions = []
@@ -322,7 +322,7 @@ def update_game_state():
                 state.p1_points += 1
                 ball_reset()
     elif state.mode == GameMode.GAME_END:
-        if state.time_game_end + 10 <= time():
+        if state.time_game_end + 6 <= time():
             state.mode = GameMode.RUNNING
             send_initial_state()
             state.p1_points, state.p2_points = (0, 0)
