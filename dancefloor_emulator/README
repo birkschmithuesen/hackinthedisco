@@ -1,0 +1,14 @@
+# Dancefloor Emulator
+A dodgy visualizer for the moving heads built using matplotlib (definitely not the right tool for the job)
+
+## Installation
+``` bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Running
+```
+python dancefloor_emulator.py
+```
