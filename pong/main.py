@@ -10,13 +10,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
-update_rate = 1 / 20
+update_rate = 1 / 60
 check_trackers_up_to = 15
 game_dim_x = 17.0  # in meters
-game_dim_y = 10.0  # in meters
-pedal_height = 3.5  # in meters
+y_dim_offset = 1
+game_dim_y = 6.5 - y_dim_offset  # in meters
+pedal_height = 2  # in meters
 win_threshold = 4  # number of points to win
-
+paddle_offset = 2
 
 positions = []
 
@@ -50,7 +51,7 @@ class GameState:
     time_game_end: float = 0.0
 
 
-default_ball_speed = 0.2
+default_ball_speed = 0.05
 
 player1_lights = [0, 1, 2, 3, 4]
 player2_lights = [15, 16, 17, 18, 19]
@@ -71,6 +72,9 @@ send_ip = "127.0.0.1"
 # send_ip = "192.168.0.232"
 send_port = 12344
 
+audio_send_ip = "192.168.0.230"
+audio_send_port = 1000
+
 n_trackers = 15
 n_lights = 20
 
@@ -79,6 +83,7 @@ send_path = "/light{}/{}"
 
 thread_runs = True
 client = udp_client.SimpleUDPClient(send_ip, send_port)
+audio_client = udp_client.SimpleUDPClient(audio_send_ip, audio_send_port)
 
 
 # OSC Input Handlers
@@ -87,7 +92,7 @@ def handle_x(unused_addr, args, x_pos, *mehr_args):
 
 
 def handle_y(unused_addr, args, y_pos, *mehr_args):
-    positions[args[0]].y = y_pos
+    positions[args[0]].y = y_pos - y_dim_offset
 
 
 def handle_speed(unused_addr, args, speed, *mehr_args):
@@ -119,12 +124,12 @@ def set_ypos(lights: list, ypos: float):
     print(lights)
 
     for l in lights:
-        client.send_message(send_path.format(l + 1, "ypos"), ypos)
+        client.send_message(send_path.format(l + 1, "ypos"), ypos + y_dim_offset)
 
 
 def set_ypos_arr(lights: list, ypos: float):
     for l, y in zip(lights, ypos):
-        client.send_message(send_path.format(l + 1, "ypos"), y)
+        client.send_message(send_path.format(l + 1, "ypos"), y + y_dim_offset)
 
 
 def set_xpos_arr(lights: list, xpos: float):
@@ -137,6 +142,10 @@ def set_color(lights: list, color: float):
         lights = [lights]
     for l in lights:
         client.send_message(send_path.format(l + 1, "color"), color)
+
+
+def send_sound(path):
+    audio_client.send_message(path, True)
 
 
 # Higher Level Draw Functions
@@ -216,6 +225,7 @@ def send_initial_state():
     set_xpos(player1_lights, state.p1.x)
     set_xpos(player2_lights, state.p2.x)
     set_color(player_1_point_lights + player_2_point_lights, 0.2)
+    set_color(player1_lights + player2_lights, 0.3)
 
 
 def get_player_position(x_lower, x_upper):
@@ -268,27 +278,25 @@ def ball_reset():
     if state.p1_points >= win_threshold or state.p2_points >= win_threshold:
         state.mode = GameMode.GAME_END
         state.time_game_end = time()
+        send_sound("/win")
     print(f"P1 {state.p1_points}, P2 {state.p2_points}")
     state.ball.x = game_dim_x / 2.0
     state.ball.y = game_dim_y / 2.0
     state.ball_color = 0.0
-
+    send_sound("/score")
     state.ball_speed = setup_initial_ball_speed()
 
 
 def ball_x_bounce():
     # Ball caught and bounce
     state.ball_speed.x *= -1
-    state.ball_color += 1 / 20
-    if state.ball_color >= 1:
-        state.ball_color = 0.0
+    state.ball_color = (state.ball_color + 1 / 20) % 1.0
+    send_sound("/bounce")
 
 
 def ball_y_bounce():
     state.ball_speed.y *= -1
-    state.ball_color += 1 / 20
-    if state.ball_color >= 1:
-        state.ball_color = 0.0
+    state.ball_color = (state.ball_color + 1 / 20) % 1.0
 
 
 def update_game_state():
@@ -335,8 +343,8 @@ if __name__ == "__main__":
     print(positions)
 
     state = GameState(
-        p1=pos(1, 5),
-        p2=pos(16, 5),
+        p1=pos(paddle_offset, 5),
+        p2=pos(game_dim_x - paddle_offset, 5),
         ball=pos(game_dim_x / 2.0, game_dim_y / 2.0),
         # ball_speed=pos(0.2, 0),
         ball_speed=setup_initial_ball_speed(),
